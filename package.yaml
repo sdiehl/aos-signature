@@ -29,6 +29,7 @@ dependencies:
   - bytestring
   - random
   - memory
+  - mtl
 
 library:
   source-dirs: src
