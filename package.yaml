@@ -4,7 +4,7 @@ synopsis: An implementation of the AOS signatures
 description: An implementation of 1-out-of-n signatures from a variety of keys
 maintainer: Adjoint Inc (info@adjoint.io)
 license: Apache
-github: adjoint-io/schnorr-nizk
+github: adjoint-io/aos-signature
 category: Cryptography
 
 extra-source-files:
@@ -80,7 +80,6 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - schnorr-nizk
     - QuickCheck
     - tasty
     - tasty-hunit
