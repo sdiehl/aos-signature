@@ -18,48 +18,55 @@ import           Protolude                    hiding (hash, head)
 secp256k1Curve :: ECC.Curve
 secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
-testSignature :: MonadRandom m => m [Integer]
-testSignature = do
-  (vk, sk) <- ECC.generate secp256k1Curve
+testSignature :: MonadRandom m => ECC.Curve -> m (Integer, [Integer], ECC.Point)
+testSignature curve = do
+  (vk, sk) <- ECC.generate curve
 
+  -- SETUP
   -- Create list of public keys
-  let vksLen' = 10
-  vks' <- genNPubKeys secp256k1Curve vksLen'
-  pos <- fromInteger <$> generateBetween 1 (fromIntegral vksLen' - 1)
-  let vks = insertPubKey pos vk vks'
+  let participants = 10
+  vks' <- genNPubKeys curve participants
+  -- k -> position of the signer's key in the list of public keys
+  k <- fromInteger <$> generateBetween 1 (fromIntegral participants - 1)
+  let vks = insertPubKey k vk vks'
 
-  -- Compute h = H_2(L) and y = h^x_pi
-  let h = ECC.pointBaseMul secp256k1Curve (hashPubKeys secp256k1Curve vks)
-      y = ECC.pointMul secp256k1Curve (ECDSA.private_d sk) h
+  -- STEP 1
+  -- In ECC, h is a point in the curve. h = g x H_2(L)
+  -- Compute y = h x x_pi
+  let h = ECC.pointBaseMul curve (hashPubKeys curve vks)
+      y = ECC.pointMul curve (ECDSA.private_d sk) h
 
+  -- STEP 2
   -- Pick u and compute challenge c = H(L, y, m, g^u, h^u)
   u <- generateBetween 1 (n - 1)
   let msg = "hello world"
-      c = secp256k1Curve
-      challenge = genChallenge c vks y msg (gu u) (hu u) u
+  -- Initial challenge on k + 1
+  let initialChallenge = genChallenge curve vks y msg (gu u) (hu u) u
 
   -- Generate L random s values
-  ss <- replicateM vksLen' $ generateBetween 1 (n - 1)
+  ss <- replicateM participants $ generateBetween 1 (n - 1)
 
-  -- generate challenge
-  let initialState = ((pos + 1 `mod` length vks, u, challenge), [challenge])
-      -- challenges start at (pi + 1)
-      challenges = evalState (genChallenges c vks y msg g h u ss) initialState
-
+  -- Generate challenges
+  -- Challenges start at (k + 1)
+  let initialState = (((k + 1) `mod` length vks, u, initialChallenge), [initialChallenge])
+  -- reversed [ck + 1, ck + 2, ... cn, 1, ... ck]
+  let challenges = evalState (genChallenges curve vks y msg g h u ss) initialState
+  let ck = head challenges
   -- Compute s = u - x * c mod q
-  let s = u - ECDSA.private_d sk * head challenges `mod` n
+  let s = u - ECDSA.private_d sk * ck `mod` n
+  -- [c1, c2, ..., cn]
+  let ordChallenges = drop (length vks - k) (reverse challenges) <> take (length vks - k) (reverse challenges)
+  -- [s1, s2, ..., sk, ..., sn]
+  let ordSS = drop (length vks - k) ss <> [s] <> take (length vks - k) ss
 
   -- The signature is (c1, s1, ..., sn, y)
-  -- TODO: Reorder challenges
-  -- TODO: Reorder ss
-  -- TODO: get c1
-  -- TODO: Return signature
-  pure challenges
+  let c1 = head ordChallenges
+  pure (c1, ordSS, y)
   where
-    n = ECC.ecc_n (ECC.common_curve secp256k1Curve)
-    g = ECC.ecc_g (ECC.common_curve secp256k1Curve)
-    gu u = pointToBS (ECC.pointMul secp256k1Curve u g)
-    hu u = pointToBS (ECC.pointMul secp256k1Curve u g)
+    n = ECC.ecc_n (ECC.common_curve curve)
+    g = ECC.ecc_g (ECC.common_curve curve)
+    gu u = pointToBS (ECC.pointMul curve u g)
+    hu u = pointToBS (ECC.pointMul curve u g)
 
 -- | Generate challenge from a given message
 --
@@ -95,10 +102,10 @@ genChallenges c vks y msg g h u [] = do
 
 genChallenges c vks y msg g h u (s:ss) = do
   ((prevPos, prevS, prevChallenge), challenges) <- get
-  let ch = challenge prevPos prevS prevChallenge
+  let challenge = nextChallenge prevPos prevS prevChallenge
   modify $ \st ->
-      ((prevPos + 1 `mod` length vks, s, ch)
-      , ch : snd st
+      (((prevPos + 1) `mod` length vks, s, challenge)
+      , challenge : snd st
       )
   genChallenges c vks y msg g h u ss
 
@@ -107,14 +114,14 @@ genChallenges c vks y msg g h u (s:ss) = do
       pointToBS $
         ECC.pointAdd c
           (ECC.pointMul c prevS g)
-          (ECC.pointMul c prevChallenge (ECDSA.public_q $ vks !! (fromIntegral prevPos - 1)))
+          (ECC.pointMul c prevChallenge (ECDSA.public_q $ vks !! prevPos))
     hs prevPos prevS prevChallenge =
       pointToBS $ ECC.pointAdd c (ECC.pointMul c prevS h) (ECC.pointMul c prevChallenge y)
-    challenge prevPos prevS prevChallenge = genChallenge c vks y msg (gs prevPos prevS prevChallenge) (hs prevPos prevS prevChallenge) s
+    nextChallenge prevPos prevS prevChallenge = genChallenge c vks y msg (gs prevPos prevS prevChallenge) (hs prevPos prevS prevChallenge) s
 
 
 insertPubKey :: Int -> ECDSA.PublicKey -> [ECDSA.PublicKey] -> [ECDSA.PublicKey]
-insertPubKey pos vk vks = take pos vks <> [vk] <> drop pos vks
+insertPubKey k vk vks = take k vks <> [vk] <> drop k vks
 
 -- | Generate N different public keys. @L = {y1, ..., yn}@
 genNPubKeys :: MonadRandom m => ECC.Curve -> Int -> m [ECDSA.PublicKey]
