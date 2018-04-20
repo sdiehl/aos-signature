@@ -18,17 +18,32 @@ import           Protolude                    hiding (hash, head)
 secp256k1Curve :: ECC.Curve
 secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
-testSignature :: MonadRandom m => ECC.Curve -> m (Integer, [Integer], ECC.Point)
-testSignature curve = do
-  (vk, sk) <- ECC.generate curve
+testSignatureGen
+  :: MonadRandom m
+  => ECC.Curve
+  -> Int
+  -> ByteString
+  -> m (Integer, [Integer], ECC.Point)
+testSignatureGen curve nParticipants msg = do
+  -- Gen public and private keys
+  (pubKey, privKey) <- ECC.generate curve
+  pubKeys' <- genNPubKeys curve nParticipants
+  sign curve pubKeys' (pubKey, privKey) msg
 
-  -- SETUP
-  -- Create list of public keys
-  let participants = 10
-  vks' <- genNPubKeys curve participants
+
+sign
+  :: MonadRandom m
+  => ECC.Curve                            -- ^ Curve
+  -> [ECDSA.PublicKey]                    -- ^ List of participants public keys
+  -> (ECDSA.PublicKey, ECDSA.PrivateKey)  -- ^ Signer's public and private keys
+  -- -> Int                               -- ^ Signer's position in list L
+  -> ByteString                           -- ^ Message
+  -> m (Integer, [Integer], ECC.Point)
+sign curve vks' (vk, sk) msg = do
   -- k -> position of the signer's key in the list of public keys
-  k <- fromInteger <$> generateBetween 1 (fromIntegral participants - 1)
+  k <- fromInteger <$> generateBetween 1 (fromIntegral (length vks') - 1)
   let vks = insertPubKey k vk vks'
+  let participants = length vks
 
   -- STEP 1
   -- In ECC, h is a point in the curve. h = g x H_2(L)
@@ -44,29 +59,35 @@ testSignature curve = do
   let initialChallenge = genChallenge curve vks y msg (gu u) (hu u) u
 
   -- Generate L random s values
-  ss <- replicateM participants $ generateBetween 1 (n - 1)
+  ss <- replicateM (participants - 1) $ generateBetween 1 (n - 1)
 
   -- Generate challenges
   -- Challenges start at (k + 1)
-  let initialState = (((k + 1) `mod` length vks, u, initialChallenge), [initialChallenge])
+  let initialState = (((k + 1) `mod` participants, u, initialChallenge), [initialChallenge])
   -- reversed [ck + 1, ck + 2, ... cn, 1, ... ck]
   let challenges = evalState (genChallenges curve vks y msg g h u ss) initialState
-  let ck = head challenges
+      revChallenges = reverse challenges
+      ck = head challenges
+
   -- Compute s = u - x * c mod q
   let s = u - ECDSA.private_d sk * ck `mod` n
+
   -- [c1, c2, ..., cn]
-  let ordChallenges = drop (length vks - k) (reverse challenges) <> take (length vks - k) (reverse challenges)
+  let ordChallenges = drop (participants - k) revChallenges <> take (participants - k) revChallenges
+
   -- [s1, s2, ..., sk, ..., sn]
-  let ordSS = drop (length vks - k) ss <> [s] <> take (length vks - k) ss
+  let ordSS = drop (participants - k) ss <> [s] <> take (participants - k) ss
 
   -- The signature is (c1, s1, ..., sn, y)
   let c1 = head ordChallenges
+
   pure (c1, ordSS, y)
   where
     n = ECC.ecc_n (ECC.common_curve curve)
     g = ECC.ecc_g (ECC.common_curve curve)
     gu u = pointToBS (ECC.pointMul curve u g)
     hu u = pointToBS (ECC.pointMul curve u g)
+
 
 -- | Generate challenge from a given message
 --
