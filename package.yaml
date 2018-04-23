@@ -80,6 +80,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aos-signature
     - QuickCheck
     - tasty
     - tasty-hunit

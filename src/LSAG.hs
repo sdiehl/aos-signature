@@ -1,4 +1,10 @@
-module LSAG where
+module LSAG
+( secp256k1Curve
+, sign
+, verify
+, genNPubKeys
+, insert
+) where
 
 import           Control.Monad.State
 import           Crypto.Hash
@@ -12,33 +18,18 @@ import           Crypto.Random.Types          (MonadRandom)
 import qualified Data.ByteArray               as BA
 import qualified Data.ByteString              as BS
 import           Data.Monoid
-import           Data.List
+import           Data.List                    hiding (insert)
 import           Protolude                    hiding (hash, head)
 
 secp256k1Curve :: ECC.Curve
 secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
-testSignature
-  :: MonadRandom m
-  => ECC.Curve
-  -> Int
-  -> ByteString
-  -> m Bool
-testSignature curve nParticipants msg = do
-  -- Gen public and private keys
-  (pubKey, privKey) <- ECC.generate curve
-  extPubKeys <- genNPubKeys curve nParticipants
-  -- k = position of the signer's key in the list of public keys
-  k <- fromInteger <$> generateBetween 0 (toInteger $ length extPubKeys - 1)
-  let pubKeys = insertPubKey k pubKey extPubKeys
-  signature <- sign pubKeys (pubKey, privKey) k msg
-  pure $ verify pubKeys signature msg
-
+-- | Sign message
 sign
   :: MonadRandom m
   => [ECDSA.PublicKey]                    -- ^ List of public keys
   -> (ECDSA.PublicKey, ECDSA.PrivateKey)  -- ^ Signer's public and private keys
-  -> Int                                  -- ^ Signer's position in list L
+  -> Int                                  -- ^ Signer's position in list of public keys
   -> ByteString                           -- ^ Message
   -> m (Integer, [Integer], ECC.Point)
 sign pubKeys (pubKey, privKey) k msg = do
@@ -46,20 +37,17 @@ sign pubKeys (pubKey, privKey) k msg = do
   -- (sk + 1) : [sk + 2, ..., s0, 1, ..., sk - 1]
   (sK1:sK2ToPrevSK) <- replicateM (participants - 1) $ generateBetween 1 (n - 1)
 
-  --------------------- STEP 2 -----------------------
-  -- Pick u and compute challenge c = H(L, y, m, g^u, h^u)
-  -- Initial challenge on k + 1
+  -- Pick u and compute challenge c = H(L, y, m, [u] * g, [u] * h)
   u <- generateBetween 1 (n - 1)
+  -- Initial challenge at k + 1
   -- H(L, y, m, [u] * g, [u] * h)
   let chK1 = genChallenge curve pubKeys y msg (gu u) (hu u)
 
   -- Generate challenges
-  -- Challenges start at (k + 1)
   -- [ck, ..., c1, c0, ... ck + 2, ck + 1]
   let reversedChKToChK1 = runChallenges sK1 chK1 sK2ToPrevSK u y h
       chK = head reversedChKToChK1
 
-  --------------------- STEP 4 -----------------------
   -- Compute s = u - x * c mod n
   let sK = (u - ECDSA.private_d privKey * chK) `mod` n
 
@@ -70,10 +58,9 @@ sign pubKeys (pubKey, privKey) k msg = do
   -- Ordered ss: [s0, s1, ..., sk, ..., sn-1]
   -- (sK : sK1 : sK2ToPrevSK): [sk, sk + 1, ..., sk - 1]
   let orderedSS = orderSS (sK : sK1 : sK2ToPrevSK)
+      ch0 = head orderedChallenges
 
   -- The signature is (ch0, (s0, ..., sn-1), y)
-  let ch0 = head orderedChallenges
-
   pure (ch0, orderedSS, y)
 
   where
@@ -174,12 +161,11 @@ genChallenges curve pubKeys y msg ss = do
 genChallenge
   :: ECC.Curve
   -> [ECDSA.PublicKey]  -- ^ List of public keys L
-  -> ECC.Point          -- ^ y = h x [x]
+  -> ECC.Point          -- ^ y = [privKey] * h
   -> BS.ByteString      -- ^ message msg
   -> ECC.Point          -- ^ generator g
-  -> ECC.Point          -- ^ h = H(L)
+  -> ECC.Point          -- ^ h = [H(L)] * g
   -> Integer
--- TODO: Take curve from public keys
 genChallenge c pubKeys y msg g h =
   oracle c (pubKeys' <> y' <> msg <> g' <> h')
   where
@@ -188,23 +174,28 @@ genChallenge c pubKeys y msg g h =
     g' = pointToBS g
     h' = pointToBS h
 
-insertPubKey :: Int -> ECDSA.PublicKey -> [ECDSA.PublicKey] -> [ECDSA.PublicKey]
-insertPubKey k pubKey pubKeys = take k pubKeys <> [pubKey] <> drop k pubKeys
+-- | Insert element at specified position
+insert :: Int -> a -> [a] -> [a]
+insert k e l = take k l <> [e] <> drop k l
 
 -- | Generate N different public keys. @L = {y1, ..., yn}@
 genNPubKeys :: MonadRandom m => ECC.Curve -> Int -> m [ECDSA.PublicKey]
 genNPubKeys curve n = replicateM n (fst <$> ECC.generate curve)
 
+-- | Convert point to bytestring
 pointToBS :: ECC.Point -> BS.ByteString
 pointToBS ECC.PointO      = ""
 pointToBS (ECC.Point x y) = show x <> show y
 
+-- | Convert list of public keys to bytestring
 pubKeysToBS :: [ECDSA.PublicKey] -> BS.ByteString
 pubKeysToBS = foldMap (pointToBS . ECDSA.public_q)
 
+-- | Hash list of public keys
 hashPubKeys :: ECC.Curve -> [ECDSA.PublicKey] -> Integer
 hashPubKeys c = oracle c . pubKeysToBS
 
+-- | Unpredictable but deterministic random response
 oracle :: ECC.Curve -> BS.ByteString -> Integer
 oracle curve x = os2ip (sha256 x) `mod` n
   where
