@@ -14,7 +14,6 @@ import           LSAG
 
 newtype Curve = Curve ECC.Curve deriving Show
 
-
 secp256k1Curve :: ECC.Curve
 secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
@@ -26,6 +25,12 @@ instance Arbitrary Curve where
     , Curve $ ECC.getCurveByName ECC.SEC_p384r1
     ]
 
+genPoint :: ECC.Curve -> Gen ECC.Point
+genPoint curve = ECC.generateQ curve <$> arbitrary
+
+genPos :: Gen Integer
+genPos = abs <$> arbitrary `suchThat` (> 0)
+
 -- | Insert element at specified position
 insert :: Int -> a -> [a] -> [a]
 insert k e l = take k l <> [e] <> drop k l
@@ -35,6 +40,12 @@ testLSAG = testGroup "LSAG Signature"
   [ localOption (QuickCheckTests 20) $ testProperty
       "Verify signature on SEC curves"
       (forAll (choose (3, 20)) testSignature)
+  , testProperty
+      "A verifier rejects invalid signatures"
+      (forAll (choose (3, 20)) $ \nParticipants ->
+      forAll genPos $ \challenge ->
+      forAll (genPoint secp256k1Curve) $ \y ->
+      testInvalidPubKeys nParticipants y challenge)
   ]
 
 testSignature
@@ -66,3 +77,19 @@ testSignature
   signature <- liftIO $ sign pubKeys (pubKey, privKey) k (show msg)
   -- Verify signature
   pure $ verify pubKeys signature (show msg)
+
+
+-- | A verifier rejects an invalid signature
+testInvalidPubKeys
+  :: Int
+  -> ECC.Point
+  -> Integer
+  -> Curve
+  -> [Char]
+  -> Property
+testInvalidPubKeys nParticipants y ch0 (Curve curve) msg = monadicIO $ do
+  ss <- liftIO $ replicateM nParticipants $ generateBetween 1 n
+  pubKeys <- liftIO $ genNPubKeys curve nParticipants
+  pure $ not $ verify pubKeys (ch0, ss, y) (show msg)
+  where
+    n = ECC.ecc_n (ECC.common_curve curve)
