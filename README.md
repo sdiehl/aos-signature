@@ -47,7 +47,7 @@ The signature is (ch<sub>0</sub>, [s<sub>0</sub>, ..., s<sub>t-1</sub>], y).
 
 Given a message `m`, a signature of a message (ch<sub>0</sub>, [s<sub>0</sub>, ..., s<sub>t-1</sub>], y) and a list of public keys `L`, an honest verifier checks a signature as follows:
 
-1. For i  0, ..., t-1 compute ch<sub>i+1</sub> = H(L, y, m, [s<sub>i</sub>] \* g + [ch<sub>i</sub>] \* y<sub>i</sub>, [s<sub>i</sub>] \* h + [ch<sub>i</sub>] \* y), where h = [H(L)] \* g.
+1. For i in {0, ..., t-1} compute ch<sub>i+1</sub> = H(L, y, m, [s<sub>i</sub>] \* g + [ch<sub>i</sub>] \* y<sub>i</sub>, [s<sub>i</sub>] \* h + [ch<sub>i</sub>] \* y), where h = [H(L)] \* g.
 
 2. Check whether c<sub>0</sub> is equal to H(L, y, m, [s<sub>t-1</sub>] \* g + [ch<sub>t-1</sub>] \* y<sub>t-1</sub>, [s<sub>t-1</sub>] \* h + [ch<sub>t-1</sub>] \* y)
 

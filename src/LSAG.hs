@@ -113,8 +113,7 @@ verify pubKeys (ch0, [s], y) msg = panic "Invalid input"
 verify pubKeys (ch0, s0:s1:s2ToEnd, y) msg = ch0 == ch0'
   where
     curve0 = ECDSA.public_curve $ head pubKeys
-    -- In ECC, h is a point in the curve. h = g x H_2(L)
-    -- Compute y = h x x_pi
+    -- h = [H(L)] * g
     h = ECC.pointBaseMul curve0 (hashPubKeys curve0 pubKeys)
     y0 = ECDSA.public_q $ head pubKeys
     -- z0' = [s0] * g + [ch0] * y0
