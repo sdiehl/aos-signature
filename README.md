@@ -11,8 +11,7 @@ Abe-Ohkubo-Suzuki Ring Signatures
 
 In their paper, "1-out-of-n Signatures from a Variety of Keys"[1], Abe, Ohkubo and Suzuki (AOS) present a method to construct a 1-out-of-n signature scheme that allows mixture use of different flavours of keys at the same time.
 
-Linkable Spontaneous Anonymous Group (LSAG) Signature
-=====================================================
+### Linkable Spontaneous Anonymous Group (LSAG) Signature
 
 Liu, et al.[2] add the property of linkability to ring signatures. Linkability means
 that two signatures by the same signer can be identified as such, but the signer remains anonymous. It adds the feature of claimability, which allows a signer to claim responsibility by providing proof of having generated a given signature.
@@ -23,8 +22,7 @@ A LSAG signature scheme satisfies three properties:
 - **Spontaneity**: No group secret, group manager of secret sharing setup stage.
 - **Linkability**: Two signatures by the same signer can be linked.
 
-A LSAG Signature Scheme over elliptic curves
-============================================
+### A LSAG Signature Scheme over elliptic curves
 
 It consists of two parts: signature generation and signature verification. Let L = {y<sub>0</sub>, ..., y<sub>t-1</sub>} be a list of `t` public keys. Let H:{0, 1}* -> Z<sub>n</sub> where `H` is a cryptographic hash function and `n` is the order of the elliptic curve over a finite field F<sub>q</sub>. For i ∈ {0, ..., t-1},
 each user `i` has a distinct public key y<sub>i</sub> and a private key x<sub>i</sub>.
