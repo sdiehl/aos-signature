@@ -37,12 +37,12 @@ insert k e l = take k l <> [e] <> drop k l
 
 testLSAG :: TestTree
 testLSAG = testGroup "LSAG Signature"
-  [ localOption (QuickCheckTests 20) $ testProperty
+  [ localOption (QuickCheckTests 10) $ testProperty
       "Verify signature on SEC curves"
       (forAll (choose (3, 20)) testSignature)
-  , testProperty
+  , localOption (QuickCheckTests 50) $ testProperty
       "A verifier rejects invalid signatures"
-      (forAll (choose (3, 20)) $ \nParticipants ->
+      (forAll (choose (3, 15)) $ \nParticipants ->
       forAll genPos $ \challenge ->
       forAll (genPoint secp256k1Curve) $ \y ->
       testInvalidPubKeys nParticipants y challenge)
