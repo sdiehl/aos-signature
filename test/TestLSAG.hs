@@ -19,10 +19,7 @@ secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
 instance Arbitrary Curve where
   arbitrary = elements
-    [ Curve $ ECC.getCurveByName ECC.SEC_p192r1
-    , Curve secp256k1Curve
-    , Curve $ ECC.getCurveByName ECC.SEC_p256r1
-    , Curve $ ECC.getCurveByName ECC.SEC_p384r1
+    [ Curve secp256k1Curve
     ]
 
 genPoint :: ECC.Curve -> Gen ECC.Point
