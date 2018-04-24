@@ -16,7 +16,7 @@ import           Crypto.Random.Types          (MonadRandom)
 import qualified Data.ByteArray               as BA
 import qualified Data.ByteString              as BS
 import           Data.Monoid
-import           Data.List                    hiding (insert)
+import           Data.List
 import           Protolude                    hiding (hash, head)
 
 -- | Sign message
@@ -70,7 +70,7 @@ sign pubKeys (pubKey, privKey) k msg = do
     hu u = ECC.pointMul curve u h
     participants = length pubKeys
     runChallenges sK1 chK1 sK2ToPrevSK u y h = evalState
-      (genChallenges curve pubKeys y msg sK2ToPrevSK)
+      (genChallenges pubKeys y msg sK2ToPrevSK)
       (initState sK1 chK1)
     initState sK1 chK1 =
       (((k + 1) `mod` participants, sK1, chK1), [chK1])
@@ -90,63 +90,62 @@ verify pubKeys (ch0, [], y) msg = panic "Invalid input"
 verify pubKeys (ch0, [s], y) msg = panic "Invalid input"
 verify pubKeys (ch0, s0:s1:s2ToEnd, y) msg = ch0 == ch0'
   where
-    -- We assume for now that all curves are the same
-    curve = ECDSA.public_curve $ head pubKeys
+    curve0 = ECDSA.public_curve $ head pubKeys
     -- In ECC, h is a point in the curve. h = g x H_2(L)
     -- Compute y = h x x_pi
-    h = ECC.pointBaseMul curve (hashPubKeys curve pubKeys)
+    h = ECC.pointBaseMul curve0 (hashPubKeys curve0 pubKeys)
     y0 = ECDSA.public_q $ head pubKeys
     -- z0' = [s0] * g + [ch0] * y0
-    z0' = ECC.pointAdd curve
-      (ECC.pointMul curve s0 g)
-      (ECC.pointMul curve ch0 y0)
+    z0' = ECC.pointAdd curve0
+      (ECC.pointMul curve0 s0 g)
+      (ECC.pointMul curve0 ch0 y0)
     -- z0'' = [s0] * h + [c0] * y
-    z0'' = ECC.pointAdd curve
-      (ECC.pointMul curve s0 h)
-      (ECC.pointMul curve ch0 y)
-    g = ECC.ecc_g (ECC.common_curve curve)
+    z0'' = ECC.pointAdd curve0
+      (ECC.pointMul curve0 s0 h)
+      (ECC.pointMul curve0 ch0 y)
+    g = ECC.ecc_g (ECC.common_curve curve0)
     participants = length pubKeys
 
     -- initial challenge - ch1
-    ch1 = genChallenge curve pubKeys y msg z0' z0''
+    ch1 = genChallenge curve0 pubKeys y msg z0' z0''
     -- [ch0, chN-1 ..., ch2, ch1]
     challenges = evalState
-      (genChallenges curve pubKeys y msg s2ToEnd)
+      (genChallenges pubKeys y msg s2ToEnd)
       ((1 `mod` participants, s1, ch1), [ch1])
     ch0' = head challenges
 
 genChallenges
-  :: ECC.Curve
-  -> [ECDSA.PublicKey]  -- ^ List of public keys L
+  :: [ECDSA.PublicKey]  -- ^ List of public keys L
   -> ECC.Point          -- ^ y = h x [x]
   -> BS.ByteString      -- ^ message msg
   -> [Integer]          -- ^ random ss
   -> State ((Int, Integer, Integer), [Integer]) [Integer]
-genChallenges curve pubKeys y msg ss = do
+genChallenges pubKeys y msg ss = do
   ((prevK, prevS, prevCh), challenges) <- get
-  let ch = challenge prevK prevS prevCh
+  let curve = ECDSA.public_curve $ pubKeys !! prevK
+  let ch = challenge curve prevK prevS prevCh
   case ss of
     [] -> pure $ ch : challenges
     (s:ss) -> do
       put (((prevK + 1) `mod` participants, s, ch)
           , ch : challenges
           )
-      genChallenges curve pubKeys y msg ss
+      genChallenges pubKeys y msg ss
   where
-    g = ECC.ecc_g (ECC.common_curve curve)
-    h = ECC.pointBaseMul curve (hashPubKeys curve pubKeys)
-    gs prevK prevS prevCh =
+    g curve = ECC.ecc_g (ECC.common_curve curve)
+    h curve = ECC.pointBaseMul curve (hashPubKeys curve pubKeys)
+    gs curve prevK prevS prevCh =
       ECC.pointAdd curve
-        (ECC.pointMul curve prevS g)
+        (ECC.pointMul curve prevS (g curve))
         (ECC.pointMul curve prevCh (ECDSA.public_q $ pubKeys !! prevK))
-    hs prevK prevS prevCh =
+    hs curve prevK prevS prevCh =
       ECC.pointAdd curve
-        (ECC.pointMul curve prevS h)
+        (ECC.pointMul curve prevS (h curve))
         (ECC.pointMul curve prevCh y)
-    challenge prevK prevS prevCh =
+    challenge curve prevK prevS prevCh =
       genChallenge curve pubKeys y msg
-        (gs prevK prevS prevCh)
-        (hs prevK prevS prevCh)
+        (gs curve prevK prevS prevCh)
+        (hs curve prevK prevS prevCh)
     participants = length pubKeys
 
 -- | Generate challenge from a given message
