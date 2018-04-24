@@ -81,3 +81,12 @@ Signature for Ad Hoc Groups", 2004
 **Notation**:
 
 1. `[b] * P`: multiplication of a point P and a scalar b over an elliptic curve defined over a finite field modulo a prime number
+
+License
+-------
+
+```
+Copyright Adjoint Inc. (c) 2018
+
+All rights reserved.
+```
