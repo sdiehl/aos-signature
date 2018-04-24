@@ -1,3 +1,5 @@
 # Changelog for aos-signature
 
-## Unreleased changes
+## 0.1
+
+* Initial release.
