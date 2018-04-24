@@ -60,10 +60,11 @@ testSignature
 testSignature curve nParticipants msg = do
   -- Generate public and private keys
   (pubKey, privKey) <- ECC.generate curve
-  -- Random foreign participants
+  -- Generate random foreign participants
   extPubKeys <- genNPubKeys curve nParticipants
-  -- Position of the signer's key in the public keys list (k)
+  -- Position of the signer's key in the set of public keys
   k <- fromInteger <$> generateBetween 0 (toInteger $ length extPubKeys - 1)
+  -- List of public keys
   let pubKeys = insert k pubKey extPubKeys
   -- Sign message with list of public keys and signer's key pair
   signature <- sign pubKeys (pubKey, privKey) k msg
