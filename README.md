@@ -2,6 +2,8 @@
   <a href="http://www.adjoint.io"><img src="https://www.adjoint.io/images/logo-small.png" width="250"/></a>
 </p>
 
+[![CircleCI](https://circleci.com/gh/adjoint-io/aos-signature.svg?style=svg&circle-token=ec783d4839d6a26e274796dd6e014399eac3918b)](https://circleci.com/gh/adjoint-io/aos-signature)
+
 A ring signature, also know as a Spontaneous Anonymous Group (SAG) or 1-out-of-n signature, convinces a verifier that a message is signed by any member in a group of n independent signers without allowing the verifier to identify who the signer was.
 
 Abe-Ohkubo-Suzuki Ring Signatures
