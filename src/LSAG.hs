@@ -1,9 +1,7 @@
 module LSAG
-( secp256k1Curve
-, sign
+( sign
 , verify
 , genNPubKeys
-, insert
 ) where
 
 import           Control.Monad.State
@@ -20,9 +18,6 @@ import qualified Data.ByteString              as BS
 import           Data.Monoid
 import           Data.List                    hiding (insert)
 import           Protolude                    hiding (hash, head)
-
-secp256k1Curve :: ECC.Curve
-secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
 
 -- | Sign message
 sign
@@ -95,7 +90,6 @@ verify pubKeys (ch0, [], y) msg = panic "Invalid input"
 verify pubKeys (ch0, [s], y) msg = panic "Invalid input"
 verify pubKeys (ch0, s0:s1:s2ToEnd, y) msg = ch0 == ch0'
   where
-    -- TODO: Treat each public key with its curve
     -- We assume for now that all curves are the same
     curve = ECDSA.public_curve $ head pubKeys
     -- In ECC, h is a point in the curve. h = g x H_2(L)
@@ -173,10 +167,6 @@ genChallenge c pubKeys y msg g h =
     y' = pointToBS y
     g' = pointToBS g
     h' = pointToBS h
-
--- | Insert element at specified position
-insert :: Int -> a -> [a] -> [a]
-insert k e l = take k l <> [e] <> drop k l
 
 -- | Generate N different public keys. @L = {y1, ..., yn}@
 genNPubKeys :: MonadRandom m => ECC.Curve -> Int -> m [ECDSA.PublicKey]

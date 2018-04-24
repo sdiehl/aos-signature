@@ -12,10 +12,17 @@ import qualified Crypto.PubKey.ECC.Generate as ECC
 
 import           LSAG
 
+secp256k1Curve :: ECC.Curve
+secp256k1Curve = ECC.getCurveByName ECC.SEC_p256k1
+
+-- | Insert element at specified position
+insert :: Int -> a -> [a] -> [a]
+insert k e l = take k l <> [e] <> drop k l
+
 testLSAG :: TestTree
 testLSAG = testGroup "LSAG Signature"
   [ localOption (QuickCheckTests 10) $ testProperty
-      "Verify signature"
+      "Verify signature on curve SECp256k1"
       (forAll (choose (3, 50)) (testSignature secp256k1Curve))
   ]
 
