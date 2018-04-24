@@ -1,3 +1,13 @@
+-- | Implementation of Linkable Spontaneus Anonymous Group (LSAG) Signature over elliptic curve cryptography.
+--
+-- >>> (pubKey, privKey) <- ECC.generate curve -- Generate public and private keys
+-- >>> extPubKeys <- genNPubKeys curve nParticipants -- Generate random foreign participants
+-- >>> k <- fromInteger <$> generateBetween 0 (toInteger $ length extPubKeys - 1) -- Position of the signer's key in the public keys list (k)
+-- >>> let pubKeys = insert k pubKey extPubKeys -- Insert signer's public key into the list of public keys
+-- >>> signature <- sign pubKeys (pubKey, privKey) k msg -- Sign message with list of public keys and signer's key pair
+-- >>> verify pubKeys signature msg -- Verify signature
+-- True
+
 module LSAG
 ( sign
 , verify
@@ -19,7 +29,16 @@ import           Data.Monoid
 import           Data.List
 import           Protolude                    hiding (hash, head)
 
--- | Sign message
+-- | Generates a ring signature for a message given a specific set of
+-- public keys and a signing key belonging to one of the public keys
+-- in the set
+--
+-- It returns a signature (c0, ss, y) :
+--
+-- * c0: Initial value to reconstruct signature.
+-- * ss: vector of randomly generated values with encrypted secret to
+-- reconstruct signature {s0 ... sn-1}.
+-- * y: Link for current signer.
 sign
   :: MonadRandom m
   => [ECDSA.PublicKey]                    -- ^ List of public keys
@@ -81,6 +100,9 @@ sign pubKeys (pubKey, privKey) k msg = do
       drop (participants - k) sKToPrevSK <>
       take (participants - k) sKToPrevSK
 
+-- | Verify if a valid signature was made by any public key in the set of public keys L.
+--
+-- Return a boolean value indicating if signature is valid.
 verify
   :: [ECDSA.PublicKey]                    -- ^ List of participants public keys
   -> (Integer, [Integer], ECC.Point)      -- ^ Signature
