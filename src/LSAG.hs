@@ -4,7 +4,7 @@
 -- >>> extPubKeys <- genNPubKeys curve nParticipants -- Generate random foreign participants
 -- >>> k <- fromInteger <$> generateBetween 0 (toInteger $ length extPubKeys - 1) -- Position of the signer's key in the public keys list (k)
 -- >>> let pubKeys = insert k pubKey extPubKeys -- Insert signer's public key into the list of public keys
--- >>> signature <- sign pubKeys (pubKey, privKey) k msg -- Sign message with list of public keys and signer's key pair
+-- >>> signature <- sign pubKeys (pubKey, privKey) msg -- Sign message with list of public keys and signer's key pair
 -- >>> verify pubKeys signature msg -- Verify signature
 -- True
 
@@ -43,39 +43,41 @@ sign
   :: MonadRandom m
   => [ECDSA.PublicKey]                    -- ^ List of public keys
   -> (ECDSA.PublicKey, ECDSA.PrivateKey)  -- ^ Signer's public and private keys
-  -> Int                                  -- ^ Signer's position in list of public keys
   -> ByteString                           -- ^ Message
   -> m (Integer, [Integer], ECC.Point)
-sign pubKeys (pubKey, privKey) k msg = do
-  -- Generate L random s values
-  -- (sk + 1) : [sk + 2, ..., s0, 1, ..., sk - 1]
-  (sK1:sK2ToPrevSK) <- replicateM (participants - 1) $ generateBetween 1 (n - 1)
+sign pubKeys (pubKey, privKey) msg =
+  case pubKey `elemIndex` pubKeys of
+    Nothing -> panic "Signer's public key is not among public keys"
+    Just k -> do
+      -- Generate L random s values
+      -- (sk + 1) : [sk + 2, ..., s0, 1, ..., sk - 1]
+      (sK1:sK2ToPrevSK) <- replicateM (participants - 1) $ generateBetween 1 (n - 1)
 
-  -- Pick u and compute challenge c = H(L, y, m, [u] * g, [u] * h)
-  u <- generateBetween 1 (n - 1)
-  -- Initial challenge at k + 1
-  -- H(L, y, m, [u] * g, [u] * h)
-  let chK1 = genChallenge curve pubKeys y msg (gu u) (hu u)
+      -- Pick u and compute challenge c = H(L, y, m, [u] * g, [u] * h)
+      u <- generateBetween 1 (n - 1)
+      -- Initial challenge at k + 1
+      -- H(L, y, m, [u] * g, [u] * h)
+      let chK1 = genChallenge curve pubKeys y msg (gu u) (hu u)
 
-  -- Generate challenges
-  -- [ck, ..., c1, c0, ... ck + 2, ck + 1]
-  let reversedChKToChK1 = runChallenges sK1 chK1 sK2ToPrevSK u y h
-      chK = head reversedChKToChK1
+      -- Generate challenges
+      -- [ck, ..., c1, c0, ... ck + 2, ck + 1]
+      let reversedChKToChK1 = runChallenges k sK1 chK1 sK2ToPrevSK u y h
+          chK = head reversedChKToChK1
 
-  -- Compute s = u - x * c mod n
-  let sK = (u - ECDSA.private_d privKey * chK) `mod` n
+      -- Compute s = u - x * c mod n
+      let sK = (u - ECDSA.private_d privKey * chK) `mod` n
 
-  -- Reverse reversedChKToChK1: [chK + 1, ck + 2, ..., 0, 1, ..., chK]
-  -- Ordered challenges: [c0, c1, ..., cn-1]
-  let orderedChallenges = orderChallenges (reverse reversedChKToChK1)
+      -- Reverse reversedChKToChK1: [chK + 1, ck + 2, ..., 0, 1, ..., chK]
+      -- Ordered challenges: [c0, c1, ..., cn-1]
+      let orderedChallenges = orderChallenges k (reverse reversedChKToChK1)
 
-  -- Ordered ss: [s0, s1, ..., sk, ..., sn-1]
-  -- (sK : sK1 : sK2ToPrevSK): [sk, sk + 1, ..., sk - 1]
-  let orderedSS = orderSS (sK : sK1 : sK2ToPrevSK)
-      ch0 = head orderedChallenges
+      -- Ordered ss: [s0, s1, ..., sk, ..., sn-1]
+      -- (sK : sK1 : sK2ToPrevSK): [sk, sk + 1, ..., sk - 1]
+      let orderedSS = orderSS k (sK : sK1 : sK2ToPrevSK)
+          ch0 = head orderedChallenges
 
-  -- The signature is (ch0, (s0, ..., sn-1), y)
-  pure (ch0, orderedSS, y)
+      -- The signature is (ch0, (s0, ..., sn-1), y)
+      pure (ch0, orderedSS, y)
 
   where
     curve = ECDSA.public_curve pubKey
@@ -88,15 +90,15 @@ sign pubKeys (pubKey, privKey) k msg = do
     gu u = ECC.pointMul curve u g
     hu u = ECC.pointMul curve u h
     participants = length pubKeys
-    runChallenges sK1 chK1 sK2ToPrevSK u y h = evalState
+    runChallenges k sK1 chK1 sK2ToPrevSK u y h = evalState
       (genChallenges pubKeys y msg sK2ToPrevSK)
-      (initState sK1 chK1)
-    initState sK1 chK1 =
+      (initState k sK1 chK1)
+    initState k sK1 chK1 =
       (((k + 1) `mod` participants, sK1, chK1), [chK1])
-    orderChallenges ch =
+    orderChallenges k ch =
       drop (participants - (k + 1)) ch <>
       take (participants - (k + 1)) ch
-    orderSS sKToPrevSK =
+    orderSS k sKToPrevSK =
       drop (participants - k) sKToPrevSK <>
       take (participants - k) sKToPrevSK
 

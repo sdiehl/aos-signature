@@ -71,7 +71,7 @@ testSignature
   k <- liftIO $ fromInteger <$> generateBetween 0 (toInteger $ length extPubKeys - 1)
   let pubKeys = insert k pubKey extPubKeys
   -- Sign message with list of public keys and signer's key pair
-  signature <- liftIO $ sign pubKeys (pubKey, privKey) k (show msg)
+  signature <- liftIO $ sign pubKeys (pubKey, privKey) (show msg)
   -- Verify signature
   pure $ verify pubKeys signature (show msg)
 
