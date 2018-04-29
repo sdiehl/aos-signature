@@ -67,7 +67,7 @@ testSignature curve nParticipants msg = do
   -- List of public keys
   let pubKeys = insert k pubKey extPubKeys
   -- Sign message with list of public keys and signer's key pair
-  signature <- sign pubKeys (pubKey, privKey) k msg
+  signature <- sign pubKeys (pubKey, privKey) msg
   -- Verify signature
   pure $ verify pubKeys signature msg
 ```
