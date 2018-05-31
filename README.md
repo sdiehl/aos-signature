@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="http://www.adjoint.io"><img src="https://www.adjoint.io/images/logo-small.png" width="250"/></a>
+  <a href="http://www.adjoint.io"><img src="https://www.adjoint.io/assets/logos/logo-small.png" width="250"/></a>
 </p>
 
 [![CircleCI](https://circleci.com/gh/adjoint-io/aos-signature.svg?style=svg&circle-token=ec783d4839d6a26e274796dd6e014399eac3918b)](https://circleci.com/gh/adjoint-io/aos-signature)
