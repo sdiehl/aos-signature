@@ -15,6 +15,7 @@ module LSAG
 ) where
 
 import           Control.Monad.State
+import           Control.Monad.Fail
 import           Crypto.Hash
 import           Crypto.Number.Serialize      (os2ip)
 import           Crypto.Number.Generate       (generateBetween)
@@ -40,7 +41,7 @@ import           Protolude                    hiding (hash, head)
 -- reconstruct signature {s0 ... sn-1}.
 -- * y: Link for current signer.
 sign
-  :: MonadRandom m
+  :: (MonadRandom m, MonadFail m)
   => [ECDSA.PublicKey]                    -- ^ List of public keys
   -> (ECDSA.PublicKey, ECDSA.PrivateKey)  -- ^ Signer's public and private keys
   -> ByteString                           -- ^ Message
