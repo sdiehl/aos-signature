@@ -1,3 +1,4 @@
 .stack-work/
+*.sw[pon]
 aos-signature.cabal
 *~
