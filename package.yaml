@@ -1,5 +1,5 @@
 name: aos-signature
-version: 0.1.1
+version: 0.2
 synopsis: An implementation of the AOS signatures
 description: An implementation of 1-out-of-n signatures from a variety of keys
 maintainer: Adjoint Inc (info@adjoint.io)
