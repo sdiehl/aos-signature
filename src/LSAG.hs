@@ -210,20 +210,21 @@ pubKeysToBS = foldMap (pointToBS . ECDSA.public_q)
 -- | Iterative algorithm to generate H.
 -- The important to hide its discrete logarithm "k" such that H = kG
 generateH :: ECC.Point -> ECC.Curve -> [Char] -> ECC.Point
-generateH g curve extra =
+generateH g curve currHash =
   case yM of
-    Nothing -> generateH g curve (toS $ '1':extra)
+    Nothing -> generateH g curve (noise:currHash)
     Just y -> if ECC.isPointValid curve (ECC.Point x y)
       then ECC.Point x y
-      else generateH g curve (toS $ '1':extra)
+      else generateH g curve (noise:currHash)
   where
-    x = oracle curve (pointToBS g <> toS extra) `mod` p
+    x = oracle curve (pointToBS g <> toS currHash) `mod` p
     yM = sqrtModP (x ^ 3 + 7) p
     p = ECC.ecc_p cp
       where
         cp = case curve of
                ECC.CurveFP c -> c
                ECC.CurveF2m _ -> panic "Not a FP curve"
+    noise = '1'
 
 -- | Hash list of public keys
 hashPubKeys :: ECC.Curve -> [ECDSA.PublicKey] -> Integer
