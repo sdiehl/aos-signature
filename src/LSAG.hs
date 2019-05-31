@@ -83,7 +83,7 @@ sign pubKeys (pubKey, privKey) msg =
 
   where
     curve = ECDSA.public_curve pubKey
-    -- h = [Hash(L)]
+    -- h = H(L)
     h = generateH g curve (show $ hashPubKeys curve pubKeys)
     -- y = [x] * h
     y = ECC.pointMul curve (ECDSA.private_d privKey) h
@@ -117,10 +117,9 @@ verify pubKeys (ch0, [s], y) msg = panic "Invalid input"
 verify pubKeys (ch0, s0:s1:s2ToEnd, y) msg = ch0 == ch0'
   where
     curve0 = ECDSA.public_curve $ head pubKeys
-    -- h = [H(L)]
+    -- h = H(L)
     h = generateH g curve0 (show $ hashPubKeys curve0 pubKeys)
 
-    -- h = ECC.pointBaseMul curve0 (hashPubKeys curve0 pubKeys)
     y0 = ECDSA.public_q $ head pubKeys
     -- z0' = [s0] * g + [ch0] * y0
     z0' = ECC.pointAdd curve0
