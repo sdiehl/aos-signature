@@ -30,6 +30,7 @@ dependencies:
   - random
   - memory
   - mtl
+  - arithmoi
 
 library:
   source-dirs: src
